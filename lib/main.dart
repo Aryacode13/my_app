@@ -34,6 +34,35 @@ class MyApp extends StatelessWidget {
   }
 }
 
+class StepHeader extends StatelessWidget {
+  const StepHeader({super.key, required this.current});
+
+  final int current; // 1..3
+
+  Color _dot(bool active, BuildContext ctx) => active
+      ? Theme.of(ctx).colorScheme.primary
+      : Theme.of(ctx).colorScheme.primary.withOpacity(0.2);
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        for (int i = 1; i <= 3; i++)
+          Container(
+            width: 10,
+            height: 10,
+            margin: EdgeInsets.only(right: i == 3 ? 0 : 8),
+            decoration: BoxDecoration(
+              color: _dot(i == current, context),
+              shape: BoxShape.circle,
+            ),
+          )
+      ],
+    );
+  }
+}
+
 class RegistrationPage extends StatefulWidget {
   const RegistrationPage({super.key});
 
@@ -91,7 +120,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
       final redirectUrl = data['redirect_url'] as String?;
       final orderId = data['order_id'] as String?;
 
-      if (redirectUrl == null) {
+      if (redirectUrl == null || orderId == null) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Respon tidak valid dari server')),
@@ -100,28 +129,15 @@ class _RegistrationPageState extends State<RegistrationPage> {
       }
 
       if (!mounted) return;
-      
-      // Buka URL pembayaran di browser eksternal
-      final paymentUri = Uri.parse(redirectUrl);
-      if (await canLaunchUrl(paymentUri)) {
-        await launchUrl(paymentUri, mode: LaunchMode.externalApplication);
-        
-        // Tampilkan dialog konfirmasi
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Halaman pembayaran dibuka di browser. Order ID: ${orderId ?? '-'}'),
-              duration: const Duration(seconds: 5),
-            ),
-          );
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Tidak dapat membuka halaman pembayaran')),
-          );
-        }
-      }
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => PaymentStatusPage(
+            orderId: orderId,
+            email: _emailController.text.trim(),
+            redirectUrl: redirectUrl,
+          ),
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -144,9 +160,13 @@ class _RegistrationPageState extends State<RegistrationPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                const StepHeader(current: 1),
+                const SizedBox(height: 8),
+                Text('Step 1 dari 3 • Isi data', style: Theme.of(context).textTheme.labelLarge),
+                const SizedBox(height: 16),
                 TextFormField(
                   controller: _nameController,
-                  decoration: const InputDecoration(labelText: 'Nama'),
+                  decoration: const InputDecoration(labelText: 'Nama Lengkap'),
                   validator: (v) => (v == null || v.trim().isEmpty) ? 'Wajib diisi' : null,
                 ),
                 const SizedBox(height: 12),
@@ -189,11 +209,157 @@ class _RegistrationPageState extends State<RegistrationPage> {
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                         )
                       : const Icon(Icons.payment),
-                  label: const Text('Daftar & Bayar'),
+                  label: const Text('Daftar & Lanjut Bayar'),
                 )
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class PaymentStatusPage extends StatefulWidget {
+  const PaymentStatusPage({super.key, required this.orderId, required this.email, required this.redirectUrl});
+
+  final String orderId;
+  final String email;
+  final String redirectUrl;
+
+  @override
+  State<PaymentStatusPage> createState() => _PaymentStatusPageState();
+}
+
+class _PaymentStatusPageState extends State<PaymentStatusPage> {
+  bool _checking = false;
+  String? _status;
+
+  Future<void> _openPayment() async {
+    final paymentUri = Uri.parse(widget.redirectUrl);
+    if (await canLaunchUrl(paymentUri)) {
+      await launchUrl(paymentUri, mode: LaunchMode.externalApplication);
+    } else {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tidak dapat membuka halaman pembayaran')),
+      );
+    }
+  }
+
+  Future<void> _checkStatus() async {
+    setState(() => _checking = true);
+    try {
+      final client = Supabase.instance.client;
+      final row = await client
+          .from('registrations')
+          .select('status')
+          .eq('order_id', widget.orderId)
+          .maybeSingle();
+      final s = (row != null ? row['status'] as String? : null) ?? 'pending';
+      setState(() => _status = s);
+      if (s == 'settlement' && mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => SuccessPage(orderId: widget.orderId, email: widget.email),
+          ),
+        );
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Status saat ini: $s')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal cek status: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _checking = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Pembayaran')),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const StepHeader(current: 2),
+            const SizedBox(height: 8),
+            Text('Step 2 dari 3 • Pembayaran', style: Theme.of(context).textTheme.labelLarge),
+            const SizedBox(height: 12),
+            Text('Order ID: ${widget.orderId}', style: Theme.of(context).textTheme.bodySmall),
+            const SizedBox(height: 8),
+            const Text(
+              'Silakan selesaikan pembayaran Anda melalui tombol di bawah ini. Setelah bayar, tekan "Cek Status" untuk memperbarui status.',
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: _openPayment,
+              icon: const Icon(Icons.open_in_new),
+              label: const Text('Buka Halaman Pembayaran'),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: _checking ? null : _checkStatus,
+              icon: _checking
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.refresh),
+              label: const Text('Cek Status'),
+            ),
+            const SizedBox(height: 12),
+            if (_status != null)
+              Text('Status: $_status', style: Theme.of(context).textTheme.labelLarge),
+            const Spacer(),
+            const Divider(),
+            const Text('Catatan:'),
+            const Text('• Email 1 telah dikirim (instruksi pembayaran).'),
+            const Text('• Email 2 akan dikirim otomatis setelah status menjadi settlement.'),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class SuccessPage extends StatelessWidget {
+  const SuccessPage({super.key, required this.orderId, required this.email});
+
+  final String orderId;
+  final String email;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Selesai')),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const StepHeader(current: 3),
+            const SizedBox(height: 8),
+            Text('Step 3 dari 3 • Selesai', style: Theme.of(context).textTheme.labelLarge),
+            const SizedBox(height: 16),
+            const Icon(Icons.check_circle, color: Colors.green, size: 64),
+            const SizedBox(height: 12),
+            const Text('Selamat! Pendaftaran Anda telah berhasil.', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text('Order ID: $orderId'),
+            Text('Email: $email'),
+            const SizedBox(height: 16),
+            const Text('Silakan cek email Anda untuk informasi lebih lanjut.'),
+            const Spacer(),
+            FilledButton(
+              onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
+              child: const Text('Kembali ke Form'),
+            )
+          ],
         ),
       ),
     );

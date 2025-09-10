@@ -6,6 +6,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const MIDTRANS_SERVER_KEY = Deno.env.get('MIDTRANS_SERVER_KEY')!;
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')!;
+const TEST_WEBHOOK_SECRET = Deno.env.get('TEST_WEBHOOK_SECRET') || "";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -46,6 +47,38 @@ serve(async (req: Request) => {
 
 	try {
 		const payload = await req.json();
+
+		// TEST MODE: jika header x-test-webhook-secret cocok, bypass signature dan paksa settlement
+		const testSecretHeader = req.headers.get('x-test-webhook-secret') || "";
+		if (TEST_WEBHOOK_SECRET && testSecretHeader && testSecretHeader === TEST_WEBHOOK_SECRET) {
+			const forcedOrderId = payload.order_id as string;
+			if (!forcedOrderId) {
+				return new Response('Missing order_id for test', { status: 400 });
+			}
+
+			const { data, error } = await supabase
+				.from('registrations')
+				.update({ status: 'settlement', updated_at: new Date().toISOString() })
+				.eq('order_id', forcedOrderId)
+				.select('*')
+				.single();
+
+			if (error || !data) {
+				console.error('Supabase update error (test mode):', error);
+				return new Response('Update failed', { status: 500 });
+			}
+
+			await sendEmail(
+				data.email,
+				"Pembayaran Berhasil - Pendaftaran Terkonfirmasi",
+				`<p>Halo ${data.name},</p>
+				<p>Pendaftaran kamu <b>berhasil</b>. Pembayaran sudah kami terima (settlement).</p>
+				<p>Order ID: <b>${forcedOrderId}</b></p>`
+			);
+
+			return new Response('OK (test settlement)', { status: 200 });
+		}
+
 		const {
 			order_id,
 			status_code,
@@ -82,7 +115,7 @@ serve(async (req: Request) => {
 				data.email,
 				"Pembayaran Berhasil - Pendaftaran Terkonfirmasi",
 				`<p>Halo ${data.name},</p>
-				<p>Pembayaran kamu telah <b>berhasil</b> (settlement).</p>
+				<p>Pendaftaran kamu <b>berhasil</b>. Pembayaran sudah kami terima (settlement).</p>
 				<p>Order ID: <b>${order_id}</b></p>`
 			);
 		}
@@ -93,4 +126,5 @@ serve(async (req: Request) => {
 		return new Response('Internal Server Error', { status: 500 });
 	}
 });
+
 
