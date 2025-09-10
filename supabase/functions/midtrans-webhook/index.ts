@@ -84,6 +84,8 @@ serve(async (req: Request) => {
 			status_code,
 			gross_amount,
 			transaction_status,
+			payment_type,
+			fraud_status,
 			signature_key
 		} = payload;
 
@@ -96,8 +98,12 @@ serve(async (req: Request) => {
 			return new Response('Invalid signature', { status: 401 });
 		}
 
-		// Update registration status
-		const newStatus = transaction_status; // e.g. 'settlement', 'pending', 'expire', 'cancel'
+		// Normalize status: credit_card 'capture' + fraud_status 'accept' => 'settlement'
+		let newStatus: string = transaction_status;
+		if (payment_type === 'credit_card' && transaction_status === 'capture' && fraud_status === 'accept') {
+			newStatus = 'settlement';
+		}
+
 		const { data, error } = await supabase
 			.from('registrations')
 			.update({ status: newStatus, updated_at: new Date().toISOString() })
