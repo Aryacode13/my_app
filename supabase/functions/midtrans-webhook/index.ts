@@ -98,12 +98,51 @@ serve(async (req: Request) => {
 			return new Response('Invalid signature', { status: 401 });
 		}
 
-		// Normalize status: credit_card 'capture' + fraud_status 'accept' => 'settlement'
+		// Log received payload for debugging
+		console.log('Webhook payload:', {
+			order_id,
+			transaction_status,
+			payment_type,
+			fraud_status,
+			status_code
+		});
+
+		// Normalize status: map successful payment statuses to 'settlement'
 		let newStatus: string = transaction_status;
+		
+		// Credit card: capture + fraud_status accept = settlement
 		if (payment_type === 'credit_card' && transaction_status === 'capture' && fraud_status === 'accept') {
 			newStatus = 'settlement';
+			console.log('Credit card payment successful, setting status to settlement');
+		}
+		// Bank transfer: settlement = settlement
+		else if (payment_type === 'bank_transfer' && transaction_status === 'settlement') {
+			newStatus = 'settlement';
+			console.log('Bank transfer payment successful, setting status to settlement');
+		}
+		// E-wallet (Gopay): settlement = settlement
+		else if (payment_type === 'gopay' && transaction_status === 'settlement') {
+			newStatus = 'settlement';
+			console.log('Gopay payment successful, setting status to settlement');
+		}
+		// QRIS: settlement = settlement
+		else if (payment_type === 'qris' && transaction_status === 'settlement') {
+			newStatus = 'settlement';
+			console.log('QRIS payment successful, setting status to settlement');
+		}
+		// Echannel (Mandiri): settlement = settlement
+		else if (payment_type === 'echannel' && transaction_status === 'settlement') {
+			newStatus = 'settlement';
+			console.log('Echannel payment successful, setting status to settlement');
+		}
+		// Default: use original transaction_status
+		else {
+			newStatus = transaction_status;
+			console.log(`Using original status: ${transaction_status} for payment type: ${payment_type}`);
 		}
 
+		console.log(`Updating registration ${order_id} to status: ${newStatus}`);
+		
 		const { data, error } = await supabase
 			.from('registrations')
 			.update({ status: newStatus, updated_at: new Date().toISOString() })
@@ -115,6 +154,8 @@ serve(async (req: Request) => {
 			console.error('Supabase update error:', error);
 			return new Response('Update failed', { status: 500 });
 		}
+
+		console.log('Database updated successfully:', { order_id, newStatus, email: data?.email });
 
 		if (newStatus === 'settlement' && data) {
 			await sendEmail(

@@ -7,7 +7,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 // Konfigurasi Supabase
 const supabaseUrl = 'https://vmwidifukpjdmbnhaiap.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZtd2lkaWZ1a3BqZG1ibmhhaWFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczMjc1MjgsImV4cCI6MjA3MjkwMzUyOH0.pAZWMZJf8vpqaIZdcginLgNEclOkzh_pnD-YFD2EBGw';
+const supabaseAnonKey =
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZtd2lkaWZ1a3BqZG1ibmhhaWFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTczMjc1MjgsImV4cCI6MjA3MjkwMzUyOH0.pAZWMZJf8vpqaIZdcginLgNEclOkzh_pnD-YFD2EBGw';
 
 // URL untuk Supabase Edge Functions
 const functionsBaseUrl = 'https://vmwidifukpjdmbnhaiap.functions.supabase.co';
@@ -162,12 +163,14 @@ class _RegistrationPageState extends State<RegistrationPage> {
               children: [
                 const StepHeader(current: 1),
                 const SizedBox(height: 8),
-                Text('Step 1 dari 3 • Isi data', style: Theme.of(context).textTheme.labelLarge),
+                Text('Step 1 dari 3 • Isi data',
+                    style: Theme.of(context).textTheme.labelLarge),
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _nameController,
                   decoration: const InputDecoration(labelText: 'Nama Lengkap'),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Wajib diisi' : null,
+                  validator: (v) =>
+                      (v == null || v.trim().isEmpty) ? 'Wajib diisi' : null,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
@@ -185,7 +188,8 @@ class _RegistrationPageState extends State<RegistrationPage> {
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
                   decoration: const InputDecoration(labelText: 'No. HP'),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Wajib diisi' : null,
+                  validator: (v) =>
+                      (v == null || v.trim().isEmpty) ? 'Wajib diisi' : null,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
@@ -206,7 +210,8 @@ class _RegistrationPageState extends State<RegistrationPage> {
                       ? const SizedBox(
                           width: 16,
                           height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
                         )
                       : const Icon(Icons.payment),
                   label: const Text('Daftar & Lanjut Bayar'),
@@ -221,7 +226,11 @@ class _RegistrationPageState extends State<RegistrationPage> {
 }
 
 class PaymentStatusPage extends StatefulWidget {
-  const PaymentStatusPage({super.key, required this.orderId, required this.email, required this.redirectUrl});
+  const PaymentStatusPage(
+      {super.key,
+      required this.orderId,
+      required this.email,
+      required this.redirectUrl});
 
   final String orderId;
   final String email;
@@ -261,7 +270,8 @@ class _PaymentStatusPageState extends State<PaymentStatusPage> {
       if (s == 'settlement' && mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (_) => SuccessPage(orderId: widget.orderId, email: widget.email),
+            builder: (_) =>
+                SuccessPage(orderId: widget.orderId, email: widget.email),
           ),
         );
       } else {
@@ -291,9 +301,11 @@ class _PaymentStatusPageState extends State<PaymentStatusPage> {
           children: [
             const StepHeader(current: 2),
             const SizedBox(height: 8),
-            Text('Step 2 dari 3 • Pembayaran', style: Theme.of(context).textTheme.labelLarge),
+            Text('Step 2 dari 3 • Pembayaran',
+                style: Theme.of(context).textTheme.labelLarge),
             const SizedBox(height: 12),
-            Text('Order ID: ${widget.orderId}', style: Theme.of(context).textTheme.bodySmall),
+            Text('Order ID: ${widget.orderId}',
+                style: Theme.of(context).textTheme.bodySmall),
             const SizedBox(height: 8),
             const Text(
               'Silakan selesaikan pembayaran Anda melalui tombol di bawah ini. Setelah bayar, tekan "Cek Status" untuk memperbarui status.',
@@ -308,18 +320,23 @@ class _PaymentStatusPageState extends State<PaymentStatusPage> {
             OutlinedButton.icon(
               onPressed: _checking ? null : _checkStatus,
               icon: _checking
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2))
                   : const Icon(Icons.refresh),
               label: const Text('Cek Status'),
             ),
             const SizedBox(height: 12),
             if (_status != null)
-              Text('Status: $_status', style: Theme.of(context).textTheme.labelLarge),
+              Text('Status: $_status',
+                  style: Theme.of(context).textTheme.labelLarge),
             const Spacer(),
             const Divider(),
             const Text('Catatan:'),
             const Text('• Email 1 telah dikirim (instruksi pembayaran).'),
-            const Text('• Email 2 akan dikirim otomatis setelah status menjadi settlement.'),
+            const Text(
+                '• Email 2 akan dikirim otomatis setelah status menjadi settlement.'),
           ],
         ),
       ),
@@ -344,11 +361,13 @@ class SuccessPage extends StatelessWidget {
           children: [
             const StepHeader(current: 3),
             const SizedBox(height: 8),
-            Text('Step 3 dari 3 • Selesai', style: Theme.of(context).textTheme.labelLarge),
+            Text('Step 3 dari 3 • Selesai',
+                style: Theme.of(context).textTheme.labelLarge),
             const SizedBox(height: 16),
             const Icon(Icons.check_circle, color: Colors.green, size: 64),
             const SizedBox(height: 12),
-            const Text('Selamat! Pendaftaran Anda telah berhasil.', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text('Selamat! Pendaftaran Anda telah berhasil.',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Text('Order ID: $orderId'),
             Text('Email: $email'),
@@ -365,4 +384,3 @@ class SuccessPage extends StatelessWidget {
     );
   }
 }
-
